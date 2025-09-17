@@ -249,3 +249,13 @@ ModelManifest.xml
 
 .qmake.stash
 */.vscode/
+
+# Qt build artifacts
+SerialTool/Makefile
+SerialTool/SerialTool
+SerialTool/*.o
+SerialTool/moc_*.cpp
+SerialTool/moc_*.h
+SerialTool/ui_*.h
+SerialTool/qrc_*.cpp
+SerialTool/.qmake.stash
