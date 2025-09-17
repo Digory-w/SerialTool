@@ -133,7 +133,7 @@ yay -S qscintilla-qt5 qt5-serialport qt5-charts qt5-script qt5-tools
 - Ubuntu Linux 及其衍生版
 
 ```bash
-sudo apt install qscintilla-qt5 qt5-serialport qt5-charts qt5-script qt5-tools
+sudo apt install qt5-qmake qtbase5-dev libqscintilla2-qt5-dev libqt5serialport5-dev libqt5charts5-dev qttools5-dev
 ```
 
 ### Arch Linux 安装 SerialTool
@@ -143,6 +143,24 @@ yay -S serialtool
 # or:
 yay -S serialtool-git
 ```
+
+## 常见问题
+
+### 编译错误：无法打开包括文件 "Qsci/qsciscintilla.h"
+
+如果在编译时遇到以下错误：
+```
+error: C1083: 无法打开包括文件: "Qsci/qsciscintilla.h": No such file or directory
+```
+
+这表示 QScintilla 没有正确安装。请按照以下步骤解决：
+
+1. **Windows 用户**：请确保已按照上面的 "安装 QScintilla" 章节完整安装了 QScintilla
+2. **Linux 用户**：使用包管理器安装 QScintilla 开发包：
+   - Ubuntu: `sudo apt install libqscintilla2-qt5-dev`
+   - Arch Linux: `sudo pacman -S qscintilla-qt5`
+3. **验证安装**：确保 QScintilla 头文件在正确的位置
+4. **重新构建**：清理构建缓存后重新编译项目
 
 ## 交流
 
