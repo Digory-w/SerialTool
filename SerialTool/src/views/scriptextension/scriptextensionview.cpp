@@ -1,129 +1,124 @@
 #include "scriptextensionview.h"
-#include <QtScript/QScriptEngine>
-#include <QUiLoader>
 #include <QHBoxLayout>
 #include <QSettings>
 #include <QFile>
 #include <QDebug>
 #include <QPushButton>
+#include <QLabel>
 
 ScriptExtensionView::ScriptExtensionView(const QString &fileName, QWidget *parent) :
     AbstractView(parent),
-    m_script(new QScriptEngine)
+    m_fileName(fileName)
 {
-    QFile file(fileName);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        loadUi(fileName.left(fileName.size() - 3) + ".ui");
-        QScriptValue scriptObj = m_script->newQObject(this);
-        m_script->globalObject().setProperty("view", scriptObj);
-        m_script->evaluate(file.readAll());
-        file.close();
-    }
-    m_script->evaluate("view.init()");
+    // Script functionality disabled - Qt Script module not available
+    // Create a simple placeholder UI indicating the feature is disabled
+    QHBoxLayout *layout = new QHBoxLayout(this);
+    QLabel *label = new QLabel(tr("Script extensions not available\n(Qt Script module removed for compatibility)"), this);
+    label->setAlignment(Qt::AlignCenter);
+    label->setStyleSheet("QLabel { color: gray; font-style: italic; }");
+    layout->addWidget(label);
+    setLayout(layout);
+    
+    qDebug() << "Script extension disabled for file:" << fileName;
 }
 
 void ScriptExtensionView::loadUi(const QString &fileName)
 {
-    QFile uiFile(fileName);
-    if (uiFile.open(QIODevice::ReadOnly)) {
-        QUiLoader loader;
-        QHBoxLayout *layout = new QHBoxLayout(this);
-        QWidget *widget = loader.load(&uiFile, this);
-        layout->addWidget(widget);
-        setLayout(layout);
-    }
+    // UI loading disabled - script functionality not available
+    Q_UNUSED(fileName);
 }
 
 void ScriptExtensionView::transmitData(const QString &data)
 {
-    emit AbstractView::transmitData(data.toLocal8Bit());
+    // Script functionality disabled
+    Q_UNUSED(data);
 }
 
 void ScriptExtensionView::sendMessage(const QString &receiver, const QString &message)
 {
-    emit AbstractView::sendMessage(receiver, message.toLocal8Bit());
+    // Script functionality disabled
+    Q_UNUSED(receiver);
+    Q_UNUSED(message);
 }
 
 QString ScriptExtensionView::title()
 {
-    return m_script->evaluate("view.title()").toString();
+    return tr("Script Extension (Disabled)");
 }
 
 QString ScriptExtensionView::iid()
 {
-    return m_script->evaluate("view.iid()").toString();
+    return "ScriptExtensionView_Disabled";
 }
 
 void ScriptExtensionView::clear()
 {
-    m_script->evaluate("view.clear()");
+    // Script functionality disabled
 }
 
 void ScriptExtensionView::loadConfig(QSettings *config)
 {
-    QScriptValue view = m_script->evaluate("view");
-    view.property("loadConfig").call(view,
-        QScriptValueList() << m_script->newQObject(config));
+    // Script functionality disabled
+    Q_UNUSED(config);
 }
 
 void ScriptExtensionView::saveConfig(QSettings *config)
 {
-    QScriptValue view = m_script->evaluate("view");
-    view.property("saveConfig").call(view,
-        QScriptValueList() << m_script->newQObject(config));
+    // Script functionality disabled
+    Q_UNUSED(config);
 }
 
 void ScriptExtensionView::loadSettings(QSettings *config)
 {
-    QScriptValue view = m_script->evaluate("view");
-    view.property("loadSettings").call(view,
-        QScriptValueList() << m_script->newQObject(config));
+    // Script functionality disabled
+    Q_UNUSED(config);
 }
 
 void ScriptExtensionView::retranslate()
 {
-    m_script->evaluate("view.retranslate()");
+    // Script functionality disabled
 }
-
 
 void ScriptExtensionView::receiveData(const QByteArray &array)
 {
-    QScriptValue view = m_script->evaluate("view");
-    QString string(QString::fromLocal8Bit(array));
-    view.property("receiveData").call(view, QScriptValueList() << string);
+    // Script functionality disabled
+    Q_UNUSED(array);
 }
 
 void ScriptExtensionView::setEnabled(bool enabled)
 {
-    QScriptValue view = m_script->evaluate("view");
-    view.property("setEnabled").call(view, QScriptValueList() << enabled);
+    // Script functionality disabled
+    Q_UNUSED(enabled);
+    AbstractView::setEnabled(false); // Always disabled
 }
 
 QString ScriptExtensionView::openFileFilter()
 {
-    return m_script->evaluate("view.openFileFilter()").toString();
+    return QString(); // No file operations supported
 }
 
 QString ScriptExtensionView::saveFileFilter()
 {
-    return m_script->evaluate("view.openFileFilter()").toString();
+    return QString(); // No file operations supported
 }
 
 void ScriptExtensionView::saveFile(const QString &fileName, const QString &filter)
 {
-    QScriptValue view = m_script->evaluate("view");
-    view.property("saveFile").call(view, QScriptValueList() << fileName << filter);
+    // Script functionality disabled
+    Q_UNUSED(fileName);
+    Q_UNUSED(filter);
 }
 
 void ScriptExtensionView::openFile(const QString &fileName, const QString &filter)
 {
-    QScriptValue view = m_script->evaluate("view");
-    view.property("openFile").call(view, QScriptValueList() << fileName << filter);
+    // Script functionality disabled
+    Q_UNUSED(fileName);
+    Q_UNUSED(filter);
 }
 
 void ScriptExtensionView::takeMessage(const QString &sender, const QByteArray &message)
 {
-    QScriptValue view = m_script->evaluate("view");
-    view.property("takeMessage").call(view,
-        QScriptValueList() << sender << m_script->newVariant(message));
+    // Script functionality disabled
+    Q_UNUSED(sender);
+    Q_UNUSED(message);
 }

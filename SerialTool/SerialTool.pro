@@ -3,7 +3,7 @@
 # Project created by QtCreator 2017-02-01T17:03:23
 #
 #-------------------------------------------------
-QT       += core gui widgets serialport network charts script uitools
+QT       += core gui widgets serialport network charts
 
 TARGET = SerialTool
 

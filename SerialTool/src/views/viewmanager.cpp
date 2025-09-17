@@ -189,12 +189,13 @@ QVector<AbstractView *> ViewManager::loadExtensions(const QString &path)
             list.append(view);
         }
     }
-    for (QString fileName : dir.entryList(QStringList("*.js"), QDir::Files)) {
-        QString name = dir.absoluteFilePath(fileName);
-        AbstractView *view = new ScriptExtensionView(name, m_window);
-        if (view) {
-            list.append(view);
-        }
-    }
+    // JavaScript extension loading disabled - Qt Script module removed
+    // for (QString fileName : dir.entryList(QStringList("*.js"), QDir::Files)) {
+    //     QString name = dir.absoluteFilePath(fileName);
+    //     AbstractView *view = new ScriptExtensionView(name, m_window);
+    //     if (view) {
+    //         list.append(view);
+    //     }
+    // }
     return list;
 }

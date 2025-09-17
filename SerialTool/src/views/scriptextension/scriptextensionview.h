@@ -3,7 +3,8 @@
 
 #include "../abstractview.h"
 
-class QScriptEngine;
+// Forward declarations - remove QScriptEngine dependency
+class QWidget;
 
 class ScriptExtensionView : public AbstractView
 {
@@ -36,7 +37,8 @@ private:
     void loadUi(const QString &fileName);
 
 private:
-    QScriptEngine *m_script;
+    // Removed QScriptEngine *m_script; - no longer using Qt Script
+    QString m_fileName;
 };
 
 #endif // SCRIPTEXTENSIONVIEW_H
