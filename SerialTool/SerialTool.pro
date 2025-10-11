@@ -3,20 +3,20 @@
 # Project created by QtCreator 2017-02-01T17:03:23
 #
 #-------------------------------------------------
-QT       += core gui widgets serialport network charts script uitools
-
+QT       += core gui widgets serialport network charts
+QT       -= script uitools   # 若未使用 uitools 也去掉
 TARGET = SerialTool
 
 TEMPLATE = app
 
-CONFIG  += qscintilla2
+CONFIG  -= qscintilla2
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked as deprecated (the exact warnings
 # depend on your compiler). Please consult the documentation of the
 # deprecated API in order to know how to port your code away from it.
-DEFINES += QT_DEPRECATED_WARNINGS QSCINTILLA_DLL
-
+DEFINES += QT_DEPRECATED_WARNINGS
+DEFINES += NO_QSCI NO_SCRIPT
 # You can also make your code fail to compile if you use deprecated APIs.
 # In order to do so, uncomment the following line.
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
@@ -32,6 +32,24 @@ RC_FILE += resource/serialtool.rc
 
 INCLUDEPATH += include
 
+win32 {
+    # MSVC 专用
+    msvc {
+        QMAKE_CFLAGS   += /utf-8
+        QMAKE_CXXFLAGS += /utf-8
+        QMAKE_RCFLAGS  += /codepage 65001
+        DEFINES += NOMINMAX
+    }
+
+    # MinGW / gcc 专用
+    gcc {
+        QMAKE_CFLAGS   += -finput-charset=UTF-8 -fexec-charset=UTF-8
+        QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
+        QMAKE_RCFLAGS  += --codepage=65001
+    }
+}
+
+
 SOURCES += \
     src/aboutbox.cpp \
     src/main.cpp \
@@ -44,7 +62,7 @@ SOURCES += \
     src/port/tcpudpport.cpp \
     src/port/serialport.cpp \
     src/views/viewmanager.cpp \
-    src/views/scriptextension/scriptextensionview.cpp \
+    #src/views/scriptextension/scriptextensionview.cpp \
     src/views/texttr/textedit.cpp \
     src/views/texttr/texttrview.cpp \
     src/views/terminal/terminalview.cpp \
@@ -84,7 +102,7 @@ HEADERS  += \
     src/port/serialport.h \
     src/views/viewmanager.h \
     src/views/abstractview.h \
-    src/views/scriptextension/scriptextensionview.h \
+    #src/views/scriptextension/scriptextensionview.h \
     src/views/texttr/textedit.h \
     src/views/texttr/texttrview.h \
     src/views/terminal/terminalview.h \

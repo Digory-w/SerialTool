@@ -4,24 +4,29 @@
 #include "../abstractview.h"
 #include "filethread.h"
 
-namespace Ui {
-    class FileTransmitView;
-}
+#include <QString>      // 用在返回值
+#include <QByteArray>   // 用在参数/成员
+#include <QColor>       // 用在默认参数 Qt::black
+
+class QSettings;        // 只做指针/引用传递：前置声明即可
+class QAction;          // 若接口里出现 QAction*，同理前置声明
+
+namespace Ui { class FileTransmitView; }
 
 class FileTransmitView : public AbstractView
 {
     Q_OBJECT
-
 public:
-    FileTransmitView(QWidget *parent = nullptr);
-    ~FileTransmitView();
+    explicit FileTransmitView(QWidget *parent = nullptr);
+    ~FileTransmitView() override;
 
     QString title() { return tr("File Transmit"); }
-    QString iid() { return "file_transmit"; }
+    QString iid()   { return "file_transmit"; }
+
     void retranslate();
     void loadConfig(QSettings *config);
     void saveConfig(QSettings *config);
-    void setEnabled(bool enabled);
+    void setEnabled(bool enabled) override;
 
 public slots:
     void receiveData(const QByteArray &array);
@@ -41,7 +46,7 @@ private slots:
 private:
     Ui::FileTransmitView *ui;
     FileThread thread;
-    QByteArray receiveArray; // 接收缓冲区
+    QByteArray receiveArray;
 };
 
 #endif // FILETRANSFERVIEW_H

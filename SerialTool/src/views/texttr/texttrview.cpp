@@ -216,13 +216,13 @@ void TextTRView::sendData()
 
     if (ui->portWriteAscii->isChecked() == true) {
         if(m_codecName == "ASCII"){
-            array = ui->textEditTx->text().toLatin1();
+            array = ui->textEditTx->toPlainText().toLatin1();
         }else{
             QTextCodec *code = QTextCodec::codecForName(m_codecName);
-            array = code->fromUnicode(ui->textEditTx->text());
+            array = code->fromUnicode(ui->textEditTx->toPlainText());
         }
     } else {
-        array = QByteArray::fromHex(ui->textEditTx->text().toLatin1());
+        array = QByteArray::fromHex(ui->textEditTx->toPlainText().toLatin1());
     }
     emit transmitData(array);
 }
@@ -234,7 +234,7 @@ void TextTRView::onWrapBoxChanged(int status)
 
 void TextTRView::onSendButtonClicked()
 {
-    QString str = ui->textEditTx->text();
+    QString str = ui->textEditTx->toPlainText();
     if (!str.isEmpty()) {
         sendData();
 
@@ -292,7 +292,7 @@ void TextTRView::setTextCodec(const QString &name)
 
 void TextTRView::onHistoryBoxChanged(const QString &string)
 {
-    ui->textEditTx->setText(string);
+    ui->textEditTx->setPlainText(string);
 }
 
 void TextTRView::arrayToHex(QString &str, const QByteArray &array, int countOfLine)
@@ -453,7 +453,7 @@ void TextTRView::saveText(const QString &fname)
     QFile file(fname);
 
     if (file.open(QFile::WriteOnly)) {
-        file.write(ui->textEditRx->text().toUtf8());
+        file.write(ui->textEditRx->toPlainText().toUtf8());
         file.close();
     }
 }

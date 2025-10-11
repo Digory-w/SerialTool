@@ -3,6 +3,7 @@
 #include "toolbox/toolboxmanager.h"
 #include "port/portmanager.h"
 #include <QDebug>
+#include <QByteArray>
 
 Controller::Controller(QString *docPath, QMainWindow *window, QMenu *menu,
                        QAction *openAction, QAction *saveAction)

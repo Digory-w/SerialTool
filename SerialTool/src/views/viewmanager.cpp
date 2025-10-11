@@ -9,7 +9,10 @@
 #include <QMessageBox>
 #include <QDebug>
 #include "abstractview.h"
-#include "scriptextension/scriptextensionview.h"
+#ifndef NO_SCRIPT
+#include "views/scriptextension/scriptextensionview.h"
+#endif
+
 #include "texttr/texttrview.h"
 #include "terminal/terminalview.h"
 #include "oscilloscope/oscilloscopeview.h"
@@ -189,12 +192,13 @@ QVector<AbstractView *> ViewManager::loadExtensions(const QString &path)
             list.append(view);
         }
     }
-    for (QString fileName : dir.entryList(QStringList("*.js"), QDir::Files)) {
-        QString name = dir.absoluteFilePath(fileName);
-        AbstractView *view = new ScriptExtensionView(name, m_window);
-        if (view) {
-            list.append(view);
-        }
-    }
+//    for (QString fileName : dir.entryList(QStringList("*.js"), QDir::Files)) {
+//        QString name = dir.absoluteFilePath(fileName);
+//        if
+//        AbstractView *view = new ScriptExtensionView(name, m_window);
+//        if (view) {
+//            list.append(view);
+//        }
+//    }
     return list;
 }

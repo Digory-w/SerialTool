@@ -2,6 +2,7 @@
 #define WAVEDECODE_H
 
 #include <QVector>
+#include <cstdint>
 
 class QByteArray;
 

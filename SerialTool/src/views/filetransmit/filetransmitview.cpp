@@ -1,10 +1,13 @@
 #include "filetransmitview.h"
 #include "ui_filetransmitview.h"
+
 #include <QSettings>
 #include <QFileDialog>
 #include <QMessageBox>
-#include <QtCore>
+#include <QDateTime>
+#include <QTextCodec>
 #include "xmodem.h"
+
 
 // 构造函数
 FileTransmitView::FileTransmitView(QWidget *parent) :
