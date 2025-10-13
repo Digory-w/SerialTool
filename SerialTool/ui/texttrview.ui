@@ -120,6 +120,13 @@
                </property>
               </widget>
              </item>
+             <item>
+              <widget class="QCheckBox" name="logFormatBox">
+               <property name="text">
+                <string>Log Format</string>
+               </property>
+              </widget>
+             </item>
             </layout>
            </widget>
           </item>
@@ -213,7 +220,107 @@
          <property name="verticalSpacing">
           <number>3</number>
          </property>
-         <item row="2" column="1">
+         <item row="0" column="0" colspan="2">
+          <widget class="TextEdit" name="textEditTx" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Ignored">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="focusPolicy">
+            <enum>Qt::StrongFocus</enum>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0" colspan="2">
+          <layout class="QHBoxLayout" name="horizontalLayout_filter">
+           <item>
+            <widget class="QLineEdit" name="filterEdit">
+             <property name="placeholderText">
+              <string>Filter</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="clearFilterButton">
+             <property name="text">
+              <string>Clear</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="showRxBox">
+             <property name="text">
+              <string>Show RX</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="showTxBox">
+             <property name="text">
+              <string>Show TX</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="2" column="0" colspan="2">
+          <layout class="QHBoxLayout" name="horizontalLayout_search">
+           <item>
+            <widget class="QLineEdit" name="searchEdit">
+             <property name="placeholderText">
+              <string>Search</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="findPrevButton">
+             <property name="text">
+              <string>Previous</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="findNextButton">
+             <property name="text">
+              <string>Next</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="3" column="0">
+          <layout class="QHBoxLayout" name="horizontalLayout_commands">
+           <item>
+            <widget class="QComboBox" name="commandBox"/>
+           </item>
+           <item>
+            <widget class="QPushButton" name="saveCommandButton">
+             <property name="text">
+              <string>Save Command</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="manageCommandsButton">
+             <property name="text">
+              <string>Manage...</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="historyBox"/>
+           </item>
+          </layout>
+         </item>
+         <item row="3" column="1">
           <widget class="QPushButton" name="sendButton">
            <property name="enabled">
             <bool>false</bool>
@@ -226,22 +333,6 @@
            </property>
            <property name="text">
             <string>Send</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QComboBox" name="historyBox"/>
-         </item>
-         <item row="0" column="0" colspan="2">
-          <widget class="TextEdit" name="textEditTx" native="true">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Ignored">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="focusPolicy">
-            <enum>Qt::StrongFocus</enum>
            </property>
           </widget>
          </item>
@@ -263,11 +354,22 @@
  </customwidgets>
  <tabstops>
   <tabstop>textEditTx</tabstop>
-  <tabstop>sendButton</tabstop>
+  <tabstop>filterEdit</tabstop>
+  <tabstop>clearFilterButton</tabstop>
+  <tabstop>showRxBox</tabstop>
+  <tabstop>showTxBox</tabstop>
+  <tabstop>searchEdit</tabstop>
+  <tabstop>findPrevButton</tabstop>
+  <tabstop>findNextButton</tabstop>
+  <tabstop>commandBox</tabstop>
+  <tabstop>saveCommandButton</tabstop>
+  <tabstop>manageCommandsButton</tabstop>
   <tabstop>historyBox</tabstop>
+  <tabstop>sendButton</tabstop>
   <tabstop>portReadAscii</tabstop>
   <tabstop>portReadHex</tabstop>
   <tabstop>wrapLineBox</tabstop>
+  <tabstop>logFormatBox</tabstop>
   <tabstop>portWriteAscii</tabstop>
   <tabstop>portWriteHex</tabstop>
   <tabstop>resendBox</tabstop>

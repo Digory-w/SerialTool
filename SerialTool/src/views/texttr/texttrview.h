@@ -2,6 +2,10 @@
 #define TEXTTRVIEW_H
 
 #include "../abstractview.h"
+#include <QDateTime>
+#include <QList>
+#include <QStringList>
+#include <QTextDocument>
 
 namespace Ui {
 class TextTRView;
@@ -30,6 +34,17 @@ public:
     void saveFile(const QString &fileName, const QString &filter);
 
 private:
+    enum class LogDirection {
+        Receive,
+        Transmit
+    };
+
+    struct LogEntry {
+        LogDirection direction;
+        QDateTime timestamp;
+        QString content;
+    };
+
     void setFontFamily(QString fonts, int size, QString style);
     void setHighlight(const QString &language);
     void setTextCodec(const QString &name);
@@ -44,13 +59,19 @@ private:
     void arrayToString(QString &str, const QByteArray &arr);
     void loadHistory(QSettings *config);
     void saveHistory(QSettings *config);
+    void loadUserCommands(QSettings *config);
+    void saveUserCommands(QSettings *config);
+    void appendLogEntry(LogDirection direction, const QString &text);
+    void refreshLogDisplay();
+    bool passesFilter(const LogEntry &entry) const;
+    QString formatLogEntry(const LogEntry &entry) const;
+    void populateCommandBox();
+    bool findText(const QString &text, QTextDocument::FindFlags flags = {});
 
     void arrayToUTF8(QString &str, const QByteArray &array);
     void arrayToUTF16(QString &str, const QByteArray &array);
     void arrayToDualByte(QString &str, const QByteArray &array);
     void arrayToASCII(QString &str, const QByteArray &array);
-
-    void appendTimeStamp(const QString &string);
 
 private slots:
     void sendData();
@@ -59,6 +80,17 @@ private slots:
     void updateResendTimerStatus();
     void setResendInterval(int msc);
     void onHistoryBoxChanged(const QString &string);
+    void onLogFormatBoxToggled(bool checked);
+    void onFilterTextChanged(const QString &text);
+    void onClearFilterButtonClicked();
+    void onShowRxBoxToggled(bool checked);
+    void onShowTxBoxToggled(bool checked);
+    void onFindNext();
+    void onFindPrevious();
+    void onSearchReturnPressed();
+    void onCommandBoxActivated(int index);
+    void onSaveCommandClicked();
+    void onManageCommandsClicked();
 
 private:
     enum TextCodec {
@@ -75,8 +107,14 @@ private:
     QByteArray *m_asciiBuf;
     enum TextCodec m_textCodec;
     QByteArray m_codecName;
-    bool m_nextFrame = true, m_timeStamp = false;
-    QString m_timeStampFormat, m_frameSeparator;
+    QList<LogEntry> m_logEntries;
+    bool m_logFormatEnabled = false;
+    bool m_showRxMessages = true;
+    bool m_showTxMessages = true;
+    QString m_filterText;
+    QString m_timeStampFormat;
+    QStringList m_userCommands;
+    QString m_lastSearch;
 };
 
 #endif // TEXTTRVIEW_H

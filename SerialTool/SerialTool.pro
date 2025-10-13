@@ -65,6 +65,7 @@ SOURCES += \
     #src/views/scriptextension/scriptextensionview.cpp \
     src/views/texttr/textedit.cpp \
     src/views/texttr/texttrview.cpp \
+    src/views/texttr/commandconfigdialog.cpp \
     src/views/terminal/terminalview.cpp \
     src/views/terminal/qvterminal/qvtchar.cpp \
     src/views/terminal/qvterminal/qvtcharformat.cpp \
@@ -105,6 +106,7 @@ HEADERS  += \
     #src/views/scriptextension/scriptextensionview.h \
     src/views/texttr/textedit.h \
     src/views/texttr/texttrview.h \
+    src/views/texttr/commandconfigdialog.h \
     src/views/terminal/terminalview.h \
     src/views/terminal/qvterminal/qvtchar.h \
     src/views/terminal/qvterminal/qvtcharformat.h \
