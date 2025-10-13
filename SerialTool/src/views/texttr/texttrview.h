@@ -3,6 +3,11 @@
 
 #include "../abstractview.h"
 
+#include <QByteArray>
+#include <QDateTime>
+#include <QStringList>
+#include <QVector>
+
 namespace Ui {
 class TextTRView;
 }
@@ -39,6 +44,15 @@ private:
     void setIndentationGuides(bool enable);
     void saveText(const QString &fname);
 
+    void appendReceivedEntry(const QString &text);
+    void rebuildReceiveView();
+    QString formatEntry(const QDateTime &timestamp, const QString &text) const;
+    void refreshCommandBox();
+    void loadUserCommands(QSettings *config);
+    void saveUserCommands(QSettings *config);
+    void rememberHistory(const QString &command);
+    void findInReceive(bool forward);
+
     void keyPressEvent(QKeyEvent  *event);
     void arrayToHex(QString &str, const QByteArray &arr, int countOfLine);
     void arrayToString(QString &str, const QByteArray &arr);
@@ -50,8 +64,6 @@ private:
     void arrayToDualByte(QString &str, const QByteArray &array);
     void arrayToASCII(QString &str, const QByteArray &array);
 
-    void appendTimeStamp(const QString &string);
-
 private slots:
     void sendData();
     void onWrapBoxChanged(int status);
@@ -59,6 +71,12 @@ private slots:
     void updateResendTimerStatus();
     void setResendInterval(int msc);
     void onHistoryBoxChanged(const QString &string);
+    void onFilterTextChanged(const QString &text);
+    void onClearFilterClicked();
+    void onSearchReturnPressed();
+    void onLogTimestampToggled(bool enabled);
+    void onSaveCommandClicked();
+    void onManageCommandsClicked();
 
 private:
     enum TextCodec {
@@ -75,8 +93,12 @@ private:
     QByteArray *m_asciiBuf;
     enum TextCodec m_textCodec;
     QByteArray m_codecName;
-    bool m_nextFrame = true, m_timeStamp = false;
-    QString m_timeStampFormat, m_frameSeparator;
+    bool m_logWithTimestamp = false;
+    QString m_timeStampFormat;
+    QVector<QDateTime> m_entryTimestamps;
+    QStringList m_receivedTexts;
+    QStringList m_historyRecords;
+    QStringList m_userCommands;
 };
 
 #endif // TEXTTRVIEW_H
