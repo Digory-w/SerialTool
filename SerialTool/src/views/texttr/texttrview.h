@@ -2,10 +2,12 @@
 #define TEXTTRVIEW_H
 
 #include "../abstractview.h"
+#include "usercommand.h"
 
 #include <QByteArray>
 #include <QDateTime>
 #include <QStringList>
+#include <QTextCharFormat>
 #include <QVector>
 
 namespace Ui {
@@ -44,9 +46,27 @@ private:
     void setIndentationGuides(bool enable);
     void saveText(const QString &fname);
 
-    void appendReceivedEntry(const QString &text);
+    enum class MessageDirection {
+        Receive,
+        Transmit
+    };
+
+    enum class MessageEncoding {
+        Ascii,
+        Hex
+    };
+
+    struct LogEntry {
+        QDateTime timestamp;
+        QString text;
+        MessageDirection direction = MessageDirection::Receive;
+        MessageEncoding encoding = MessageEncoding::Ascii;
+    };
+
+    void appendEntry(const QString &text, MessageDirection direction, MessageEncoding encoding);
     void rebuildReceiveView();
-    QString formatEntry(const QDateTime &timestamp, const QString &text) const;
+    QString formatEntry(const LogEntry &entry) const;
+    QTextCharFormat formatFor(const LogEntry &entry) const;
     void refreshCommandBox();
     void loadUserCommands(QSettings *config);
     void saveUserCommands(QSettings *config);
@@ -70,7 +90,7 @@ private slots:
     void onSendButtonClicked();
     void updateResendTimerStatus();
     void setResendInterval(int msc);
-    void onHistoryBoxChanged(const QString &string);
+    void onHistoryBoxIndexChanged(int index);
     void onFilterTextChanged(const QString &text);
     void onClearFilterClicked();
     void onSearchReturnPressed();
@@ -95,10 +115,9 @@ private:
     QByteArray m_codecName;
     bool m_logWithTimestamp = false;
     QString m_timeStampFormat;
-    QVector<QDateTime> m_entryTimestamps;
-    QStringList m_receivedTexts;
+    QVector<LogEntry> m_entries;
     QStringList m_historyRecords;
-    QStringList m_userCommands;
+    QVector<UserCommand> m_userCommands;
 };
 
 #endif // TEXTTRVIEW_H

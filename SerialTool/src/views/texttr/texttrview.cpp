@@ -2,10 +2,17 @@
 #include "ui_texttrview.h"
 #include "commandconfigdialog.h"
 #include <QCheckBox>
+#include <QColor>
+#include <QComboBox>
 #include <QDateTime>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QFile>
+#include <QFormLayout>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
+#include <QtCore/QOverload>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScrollBar>
@@ -14,10 +21,11 @@
 #include <QStandardItem>
 #include <QStandardItemModel>
 #include <QTextCodec>
-#include <QTextDocument>
 #include <QTextCursor>
+#include <QTextDocument>
 #include <QTimer>
 #include <QToolButton>
+#include <QVBoxLayout>
 
 TextTRView::TextTRView(QWidget *parent) :
     AbstractView(parent),
@@ -38,7 +46,8 @@ TextTRView::TextTRView(QWidget *parent) :
     connect(ui->resendBox, &QCheckBox::stateChanged, this, &TextTRView::updateResendTimerStatus);
     QObject::connect(m_resendTimer, &QTimer::timeout, this, &TextTRView::sendData);
     connect(ui->resendIntervalBox, SIGNAL(valueChanged(int)), this, SLOT(setResendInterval(int)));
-    connect(ui->historyBox, SIGNAL(activated(const QString &)), this, SLOT(onHistoryBoxChanged(const QString &)));
+    connect(ui->historyBox, QOverload<int>::of(&QComboBox::activated),
+            this, &TextTRView::onHistoryBoxIndexChanged);
     connect(ui->filterLineEdit, &QLineEdit::textChanged, this, &TextTRView::onFilterTextChanged);
     connect(ui->clearFilterButton, &QToolButton::clicked, this, &TextTRView::onClearFilterClicked);
     connect(ui->searchLineEdit, &QLineEdit::returnPressed, this, &TextTRView::onSearchReturnPressed);
@@ -195,9 +204,18 @@ void TextTRView::loadUserCommands(QSettings *config)
     int count = config->beginReadArray("Items");
     for (int i = 0; i < count; ++i) {
         config->setArrayIndex(i);
-        const QString value = config->value("data").toString();
-        if (!value.isEmpty()) {
-            m_userCommands.append(value);
+        UserCommand command;
+        command.command = config->value("data").toString();
+        command.name = config->value("name").toString();
+        if (command.name.isEmpty()) {
+            command.name = config->value("title").toString();
+        }
+        command.remark = config->value("remark").toString();
+        if (command.remark.isEmpty()) {
+            command.remark = config->value("note").toString();
+        }
+        if (!command.command.isEmpty()) {
+            m_userCommands.append(command);
         }
     }
     config->endArray();
@@ -210,7 +228,10 @@ void TextTRView::saveUserCommands(QSettings *config)
     config->beginWriteArray("Items");
     for (int i = 0; i < m_userCommands.size(); ++i) {
         config->setArrayIndex(i);
-        config->setValue("data", m_userCommands.at(i));
+        const UserCommand &command = m_userCommands.at(i);
+        config->setValue("data", command.command);
+        config->setValue("name", command.name);
+        config->setValue("remark", command.remark);
     }
     config->endArray();
     config->endGroup();
@@ -233,8 +254,26 @@ void TextTRView::refreshCommandBox()
     }
     model->clear();
 
-    for (const QString &command : m_userCommands) {
-        auto *item = new QStandardItem(command);
+    auto displayFor = [](const UserCommand &command) {
+        QString display = command.name.isEmpty() ? command.command : command.name;
+        if (!command.remark.isEmpty()) {
+            if (!display.isEmpty()) {
+                display.append(QStringLiteral(" — "));
+            }
+            display.append(command.remark);
+        }
+        if (display.isEmpty()) {
+            display = command.command;
+        }
+        return display;
+    };
+
+    for (const UserCommand &command : m_userCommands) {
+        auto *item = new QStandardItem(displayFor(command));
+        item->setData(command.command, Qt::UserRole);
+        if (!command.remark.isEmpty()) {
+            item->setToolTip(command.remark);
+        }
         model->appendRow(item);
     }
 
@@ -246,6 +285,7 @@ void TextTRView::refreshCommandBox()
 
     for (const QString &history : m_historyRecords) {
         auto *item = new QStandardItem(history);
+        item->setData(history, Qt::UserRole);
         model->appendRow(item);
     }
 
@@ -266,17 +306,21 @@ void TextTRView::rememberHistory(const QString &command)
     refreshCommandBox();
 }
 
-void TextTRView::appendReceivedEntry(const QString &text)
+void TextTRView::appendEntry(const QString &text, MessageDirection direction, MessageEncoding encoding)
 {
     if (text.isEmpty()) {
         return;
     }
-    QString entry = text;
-    if (!entry.endsWith('\n')) {
-        entry.append('\n');
+
+    LogEntry entry;
+    entry.timestamp = QDateTime::currentDateTime();
+    entry.text = text;
+    if (!entry.text.endsWith('\n')) {
+        entry.text.append('\n');
     }
-    m_receivedTexts.append(entry);
-    m_entryTimestamps.append(QDateTime::currentDateTime());
+    entry.direction = direction;
+    entry.encoding = encoding;
+    m_entries.append(entry);
     rebuildReceiveView();
 }
 
@@ -285,35 +329,68 @@ void TextTRView::rebuildReceiveView()
     if (!ui) {
         return;
     }
-    const QString filter = ui->filterLineEdit->text();
-    const bool atBottom = ui->textEditRx->verticalScrollBar()->value() ==
-            ui->textEditRx->verticalScrollBar()->maximum();
 
-    QString buffer;
-    buffer.reserve(m_receivedTexts.size() * 32);
-    for (int i = 0; i < m_receivedTexts.size(); ++i) {
-        const QString &raw = m_receivedTexts.at(i);
-        if (!filter.isEmpty() && !raw.contains(filter, Qt::CaseInsensitive)) {
-            continue;
+    const QString filter = ui->filterLineEdit->text();
+    auto *edit = ui->textEditRx;
+    const bool atBottom = edit->verticalScrollBar()->value() == edit->verticalScrollBar()->maximum();
+
+    edit->blockSignals(true);
+    QTextDocument *document = edit->document();
+    document->clear();
+    QTextCursor cursor(document);
+
+    for (const LogEntry &entry : m_entries) {
+        const QString header = formatEntry(entry);
+        if (!filter.isEmpty()) {
+            if (!header.contains(filter, Qt::CaseInsensitive) &&
+                !entry.text.contains(filter, Qt::CaseInsensitive)) {
+                continue;
+            }
         }
-        buffer.append(formatEntry(m_entryTimestamps.at(i), raw));
+
+        const QTextCharFormat format = formatFor(entry);
+        cursor.insertText(header, format);
+        cursor.insertText(QStringLiteral("\n"), format);
+        cursor.insertText(entry.text, format);
     }
 
-    ui->textEditRx->setPlainText(buffer);
+    edit->blockSignals(false);
+
     if (atBottom) {
-        QTextCursor cursor = ui->textEditRx->textCursor();
-        cursor.movePosition(QTextCursor::End);
-        ui->textEditRx->setTextCursor(cursor);
-        ui->textEditRx->verticalScrollBar()->setValue(ui->textEditRx->verticalScrollBar()->maximum());
+        QTextCursor endCursor = edit->textCursor();
+        endCursor.movePosition(QTextCursor::End);
+        edit->setTextCursor(endCursor);
+        edit->verticalScrollBar()->setValue(edit->verticalScrollBar()->maximum());
     }
 }
 
-QString TextTRView::formatEntry(const QDateTime &timestamp, const QString &text) const
+QString TextTRView::formatEntry(const LogEntry &entry) const
 {
-    if (!m_logWithTimestamp) {
-        return text;
+    const QString direction = entry.direction == MessageDirection::Receive ? QStringLiteral("RX")
+                                                                            : QStringLiteral("TX");
+    const QString encoding = entry.encoding == MessageEncoding::Hex ? QStringLiteral("HEX")
+                                                                    : QStringLiteral("ASCII");
+    QString header;
+    if (m_logWithTimestamp) {
+        header = QStringLiteral("[%1]# ").arg(entry.timestamp.toString(m_timeStampFormat));
     }
-    return QStringLiteral("[%1] %2").arg(timestamp.toString(m_timeStampFormat), text);
+    header.append(direction);
+    header.append(QLatin1Char(' '));
+    header.append(encoding);
+    return header;
+}
+
+QTextCharFormat TextTRView::formatFor(const LogEntry &entry) const
+{
+    QTextCharFormat format;
+    if (entry.direction == MessageDirection::Receive) {
+        format.setForeground(QColor(QStringLiteral("#1b5e20")));
+        format.setBackground(QColor(QStringLiteral("#e8f5e9")));
+    } else {
+        format.setForeground(QColor(QStringLiteral("#0d47a1")));
+        format.setBackground(QColor(QStringLiteral("#e3f2fd")));
+    }
+    return format;
 }
 
 void TextTRView::findInReceive(bool forward)
@@ -337,6 +414,7 @@ void TextTRView::findInReceive(bool forward)
 void TextTRView::receiveData(const QByteArray &array)
 {
     QString string, pre;
+    MessageEncoding encoding = MessageEncoding::Ascii;
     if (ui->portReadAscii->isChecked()) {
         if (m_hexCount > 0) {
             pre = '\n';
@@ -344,13 +422,14 @@ void TextTRView::receiveData(const QByteArray &array)
         m_hexCount = -1;
         arrayToString(string, array);
     } else {
+        encoding = MessageEncoding::Hex;
         if (m_hexCount == -1) {
             m_hexCount = 0;
             pre = '\n';
         }
         arrayToHex(string, array, 16);
     }
-    appendReceivedEntry(pre + string);
+    appendEntry(pre + string, MessageDirection::Receive, encoding);
 }
 
 void TextTRView::clear()
@@ -358,8 +437,7 @@ void TextTRView::clear()
     ui->textEditRx->clear();
     m_asciiBuf->clear();
     m_hexCount = 0;
-    m_receivedTexts.clear();
-    m_entryTimestamps.clear();
+    m_entries.clear();
     rebuildReceiveView();
 }
 
@@ -385,16 +463,23 @@ void TextTRView::setEnabled(bool enabled)
 void TextTRView::sendData()
 {
     QByteArray array;
+    const QString text = ui->textEditTx->toPlainText();
 
     if (ui->portWriteAscii->isChecked() == true) {
         if(m_codecName == "ASCII"){
-            array = ui->textEditTx->toPlainText().toLatin1();
+            array = text.toLatin1();
         }else{
             QTextCodec *code = QTextCodec::codecForName(m_codecName);
-            array = code->fromUnicode(ui->textEditTx->toPlainText());
+            array = code->fromUnicode(text);
         }
     } else {
-        array = QByteArray::fromHex(ui->textEditTx->toPlainText().toLatin1());
+        array = QByteArray::fromHex(text.toLatin1());
+    }
+
+    if (!text.isEmpty()) {
+        appendEntry(text,
+                    MessageDirection::Transmit,
+                    ui->portWriteHex->isChecked() ? MessageEncoding::Hex : MessageEncoding::Ascii);
     }
     emit transmitData(array);
 }
@@ -451,9 +536,25 @@ void TextTRView::setTextCodec(const QString &name)
     }
 }
 
-void TextTRView::onHistoryBoxChanged(const QString &string)
+void TextTRView::onHistoryBoxIndexChanged(int index)
 {
-    ui->textEditTx->setPlainText(string);
+    if (index < 0) {
+        return;
+    }
+    auto *model = qobject_cast<QStandardItemModel *>(ui->historyBox->model());
+    if (!model) {
+        return;
+    }
+    QStandardItem *item = model->item(index);
+    if (!item) {
+        return;
+    }
+    const QVariant commandData = item->data(Qt::UserRole);
+    if (!commandData.isValid()) {
+        ui->historyBox->setCurrentIndex(-1);
+        return;
+    }
+    ui->textEditTx->setPlainText(commandData.toString());
 }
 
 void TextTRView::onFilterTextChanged(const QString &)
@@ -479,14 +580,65 @@ void TextTRView::onLogTimestampToggled(bool enabled)
 
 void TextTRView::onSaveCommandClicked()
 {
-    const QString command = ui->textEditTx->toPlainText().trimmed();
-    if (command.isEmpty()) {
+    const QString commandText = ui->textEditTx->toPlainText().trimmed();
+    if (commandText.isEmpty()) {
         return;
     }
-    if (!m_userCommands.contains(command)) {
-        m_userCommands.prepend(command);
-        refreshCommandBox();
+
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Save Command"));
+    dialog.setModal(true);
+
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *formLayout = new QFormLayout();
+
+    auto *nameEdit = new QLineEdit(&dialog);
+    nameEdit->setPlaceholderText(tr("Command name"));
+
+    auto *remarkEdit = new QLineEdit(&dialog);
+    remarkEdit->setPlaceholderText(tr("Remark"));
+
+    for (const UserCommand &existing : m_userCommands) {
+        if (existing.command == commandText) {
+            nameEdit->setText(existing.name);
+            remarkEdit->setText(existing.remark);
+            break;
+        }
     }
+
+    formLayout->addRow(tr("Name"), nameEdit);
+
+    auto *commandLabel = new QLabel(commandText, &dialog);
+    commandLabel->setWordWrap(true);
+    commandLabel->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+    formLayout->addRow(tr("Command"), commandLabel);
+
+    formLayout->addRow(tr("Remark"), remarkEdit);
+
+    layout->addLayout(formLayout);
+
+    auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttonBox);
+    connect(buttonBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    UserCommand command;
+    command.command = commandText;
+    command.name = nameEdit->text().trimmed();
+    command.remark = remarkEdit->text().trimmed();
+
+    for (int i = 0; i < m_userCommands.size(); ++i) {
+        if (m_userCommands.at(i).command == command.command) {
+            m_userCommands.removeAt(i);
+            break;
+        }
+    }
+    m_userCommands.prepend(command);
+    refreshCommandBox();
 }
 
 void TextTRView::onManageCommandsClicked()
