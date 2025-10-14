@@ -28,16 +28,82 @@
      <property name="orientation">
       <enum>Qt::Vertical</enum>
      </property>
-     <widget class="TextEdit" name="textEditRx" native="true">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-        <horstretch>0</horstretch>
-        <verstretch>1</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="focusPolicy">
-       <enum>Qt::ClickFocus</enum>
-      </property>
+     <widget class="QWidget" name="rxContainer" native="true">
+      <layout class="QVBoxLayout" name="verticalLayout_rx">
+       <property name="spacing">
+        <number>4</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_filter">
+         <property name="spacing">
+          <number>4</number>
+         </property>
+         <item>
+          <widget class="QLineEdit" name="filterLineEdit">
+           <property name="placeholderText">
+            <string>Filter…</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="clearFilterButton">
+           <property name="text">
+            <string>✕</string>
+           </property>
+           <property name="toolTip">
+            <string>Clear filter</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="searchLineEdit">
+           <property name="placeholderText">
+            <string>Search…</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="searchPrevButton">
+           <property name="text">
+            <string>Prev</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="searchNextButton">
+           <property name="text">
+            <string>Next</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="TextEdit" name="textEditRx" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>1</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="focusPolicy">
+          <enum>Qt::ClickFocus</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </widget>
      <widget class="QWidget" name="layoutWidget_5">
       <layout class="QHBoxLayout" name="horizontalLayout_19">
@@ -117,6 +183,13 @@
                </property>
                <property name="text">
                 <string>Wrap Line</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="logTimestampBox">
+               <property name="text">
+                <string>Show Timestamp</string>
                </property>
               </widget>
              </item>
@@ -213,6 +286,30 @@
          <property name="verticalSpacing">
           <number>3</number>
          </property>
+         <item row="1" column="0" colspan="2">
+          <layout class="QHBoxLayout" name="commandLayout">
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QComboBox" name="historyBox"/>
+           </item>
+           <item>
+            <widget class="QPushButton" name="saveCommandButton">
+             <property name="text">
+              <string>Save Command</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="manageCommandsButton">
+             <property name="text">
+              <string>Manage…</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
          <item row="2" column="1">
           <widget class="QPushButton" name="sendButton">
            <property name="enabled">
@@ -228,9 +325,6 @@
             <string>Send</string>
            </property>
           </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QComboBox" name="historyBox"/>
          </item>
          <item row="0" column="0" colspan="2">
           <widget class="TextEdit" name="textEditTx" native="true">
@@ -263,11 +357,14 @@
  </customwidgets>
  <tabstops>
   <tabstop>textEditTx</tabstop>
-  <tabstop>sendButton</tabstop>
   <tabstop>historyBox</tabstop>
+  <tabstop>saveCommandButton</tabstop>
+  <tabstop>manageCommandsButton</tabstop>
+  <tabstop>sendButton</tabstop>
   <tabstop>portReadAscii</tabstop>
   <tabstop>portReadHex</tabstop>
   <tabstop>wrapLineBox</tabstop>
+  <tabstop>logTimestampBox</tabstop>
   <tabstop>portWriteAscii</tabstop>
   <tabstop>portWriteHex</tabstop>
   <tabstop>resendBox</tabstop>

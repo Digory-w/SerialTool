@@ -1,10 +1,27 @@
 #include "texttrview.h"
 #include "ui_texttrview.h"
-#include <QSettings>
-#include <QTextCodec>
-#include <QTimer>
-#include <QKeyEvent>
+#include "commandconfigdialog.h"
+#include "commandeditdialog.h"
+#include <QCheckBox>
+#include <QColor>
 #include <QDateTime>
+#include <QFile>
+#include <QKeyEvent>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QRadioButton>
+#include <QScrollBar>
+#include <QSettings>
+#include <QSignalBlocker>
+#include <QStandardItem>
+#include <QStandardItemModel>
+#include <QTextCodec>
+#include <QTextCursor>
+#include <QTextDocument>
+#include <QTimer>
+#include <QToolButton>
+#include <QVariant>
+#include <algorithm>
 
 TextTRView::TextTRView(QWidget *parent) :
     AbstractView(parent),
@@ -26,7 +43,16 @@ TextTRView::TextTRView(QWidget *parent) :
     QObject::connect(m_resendTimer, &QTimer::timeout, this, &TextTRView::sendData);
     connect(ui->resendIntervalBox, SIGNAL(valueChanged(int)), this, SLOT(setResendInterval(int)));
     connect(ui->historyBox, SIGNAL(activated(const QString &)), this, SLOT(onHistoryBoxChanged(const QString &)));
-    connect(ui->wrapLineBox, SIGNAL(stateChanged(int)), this, SLOT(onWrapBoxChanged(int)));
+    connect(ui->filterLineEdit, &QLineEdit::textChanged, this, &TextTRView::onFilterTextChanged);
+    connect(ui->clearFilterButton, &QToolButton::clicked, this, &TextTRView::onClearFilterClicked);
+    connect(ui->searchLineEdit, &QLineEdit::returnPressed, this, &TextTRView::onSearchReturnPressed);
+    connect(ui->searchNextButton, &QPushButton::clicked, this, [this]() { findInReceive(true); });
+    connect(ui->searchPrevButton, &QPushButton::clicked, this, [this]() { findInReceive(false); });
+    connect(ui->logTimestampBox, &QCheckBox::toggled, this, &TextTRView::onLogTimestampToggled);
+    connect(ui->saveCommandButton, &QPushButton::clicked, this, &TextTRView::onSaveCommandClicked);
+    connect(ui->manageCommandsButton, &QPushButton::clicked, this, &TextTRView::onManageCommandsClicked);
+
+    refreshCommandBox();
 }
 
 TextTRView::~TextTRView()
@@ -77,10 +103,19 @@ void TextTRView::loadConfig(QSettings *config)
     ui->wrapLineBox->setChecked(status);
     ui->textEditRx->setWrap(status);
 
-    // load history
+    m_logWithTimestamp = config->value("LogWithTimestamp").toBool();
+    {
+        QSignalBlocker blocker(ui->logTimestampBox);
+        ui->logTimestampBox->setChecked(m_logWithTimestamp);
+    }
+
+    // load history & user commands
     loadHistory(config);
+    loadUserCommands(config);
 
     config->endGroup();
+
+    refreshCommandBox();
 }
 
 void TextTRView::saveConfig(QSettings *config)
@@ -99,9 +134,11 @@ void TextTRView::saveConfig(QSettings *config)
     config->setValue("ResendMode", QVariant(ui->resendBox->isChecked()));
     // save warp line
     config->setValue("RxAreaWrapLine", QVariant(ui->wrapLineBox->isChecked()));
+    config->setValue("LogWithTimestamp", QVariant(ui->logTimestampBox->isChecked()));
 
     // save history
     saveHistory(config);
+    saveUserCommands(config);
 
     config->endGroup();
 }
@@ -123,32 +160,67 @@ void TextTRView::loadSettings(QSettings *config)
     setTabWidth(config->value("TerminalTabWidth").toInt());
     setAutoIndent(config->value("TerminalAutoIndent").toBool());
     setIndentationGuides(config->value("TerminalIndentationGuides").toBool());
-    m_timeStamp = config->value("TerminalUseTimeStamp").toBool();
-    m_frameSeparator = config->value("TerminalFrameSeparator").toString();
-    m_timeStampFormat = config->value("TerminalTimeStampFormat").toString();
+    m_timeStampFormat = config->value("TerminalTimeStampFormat", "yyyy-MM-dd HH:mm:ss").toString();
+    if (m_timeStampFormat.isEmpty()) {
+        m_timeStampFormat = QStringLiteral("yyyy-MM-dd HH:mm:ss");
+    }
+    rebuildReceiveView();
 }
 
 void TextTRView::loadHistory(QSettings *config)
 {
+    m_historyRecords.clear();
     config->beginGroup("HistoryBox");
     int count = config->beginReadArray("Items");
     for (int i = 0; i < count; ++i) {
         config->setArrayIndex(i);
-        ui->historyBox->addItem(config->value("data").toString());
+        m_historyRecords.append(config->value("data").toString());
     }
     config->endArray();
-    ui->historyBox->setCurrentIndex(0);
     config->endGroup();
 }
 
 void TextTRView::saveHistory(QSettings *config)
 {
     config->beginGroup("HistoryBox");
-    int count = ui->historyBox->count();
     config->beginWriteArray("Items");
+    for (int i = 0; i < m_historyRecords.size(); ++i) {
+        config->setArrayIndex(i);
+        config->setValue("data", m_historyRecords.at(i));
+    }
+    config->endArray();
+    config->endGroup();
+}
+
+void TextTRView::loadUserCommands(QSettings *config)
+{
+    m_userCommands.clear();
+    config->beginGroup("UserCommands");
+    const int count = config->beginReadArray("Items");
     for (int i = 0; i < count; ++i) {
         config->setArrayIndex(i);
-        config->setValue("data", ui->historyBox->itemText(i));
+        CommandPreset preset;
+        preset.name = config->value("name").toString();
+        preset.command = config->value("data").toString();
+        preset.note = config->value("note").toString();
+        if (!preset.command.isEmpty()) {
+            m_userCommands.append(preset);
+        }
+    }
+    config->endArray();
+    config->endGroup();
+}
+
+void TextTRView::saveUserCommands(QSettings *config)
+{
+    config->beginGroup("UserCommands");
+    config->beginWriteArray("Items");
+    for (int i = 0; i < m_userCommands.size(); ++i) {
+        config->setArrayIndex(i);
+        const CommandPreset &preset = m_userCommands.at(i);
+        config->setValue("name", preset.name);
+        config->setValue("data", preset.command);
+        config->setValue("note", preset.note);
     }
     config->endArray();
     config->endGroup();
@@ -161,27 +233,199 @@ void TextTRView::setHighlight(const QString &language)
     ui->textEditRx->setHighLight(language);
 }
 
+void TextTRView::refreshCommandBox()
+{
+    QSignalBlocker blocker(ui->historyBox);
+    auto *model = qobject_cast<QStandardItemModel *>(ui->historyBox->model());
+    if (!model) {
+        model = new QStandardItemModel(ui->historyBox);
+        ui->historyBox->setModel(model);
+    }
+    model->clear();
+
+    for (const CommandPreset &preset : m_userCommands) {
+        auto *item = new QStandardItem(commandDisplayText(preset));
+        item->setData(preset.command, Qt::UserRole);
+        model->appendRow(item);
+    }
+
+    if (!m_userCommands.isEmpty() && !m_historyRecords.isEmpty()) {
+        auto *separator = new QStandardItem(QStringLiteral("──────────"));
+        separator->setFlags(Qt::NoItemFlags);
+        model->appendRow(separator);
+    }
+
+    for (const QString &history : m_historyRecords) {
+        auto *item = new QStandardItem(history);
+        item->setData(history, Qt::UserRole);
+        model->appendRow(item);
+    }
+
+    ui->historyBox->setCurrentIndex(-1);
+}
+
+void TextTRView::rememberHistory(const QString &command)
+{
+    if (command.isEmpty()) {
+        return;
+    }
+    m_historyRecords.removeAll(command);
+    m_historyRecords.prepend(command);
+    const int kMaxHistory = 20;
+    while (m_historyRecords.size() > kMaxHistory) {
+        m_historyRecords.removeLast();
+    }
+    refreshCommandBox();
+}
+
+void TextTRView::appendLogEntry(LogDirection direction, bool isHexMode, const QString &text)
+{
+    if (text.isEmpty()) {
+        return;
+    }
+    QString entryText = text;
+    while (entryText.endsWith('\n') || entryText.endsWith('\r')) {
+        entryText.chop(1);
+    }
+    if (entryText.isEmpty()) {
+        return;
+    }
+    LogEntry entry;
+    entry.timestamp = QDateTime::currentDateTime();
+    entry.text = entryText;
+    entry.direction = direction;
+    entry.isHex = isHexMode;
+    m_logEntries.append(entry);
+    rebuildReceiveView();
+}
+
+void TextTRView::rebuildReceiveView()
+{
+    if (!ui) {
+        return;
+    }
+    const QString filter = ui->filterLineEdit->text();
+    const bool atBottom = ui->textEditRx->verticalScrollBar()->value() ==
+            ui->textEditRx->verticalScrollBar()->maximum();
+
+    ui->textEditRx->clear();
+    QTextCursor cursor = ui->textEditRx->textCursor();
+    cursor.movePosition(QTextCursor::Start);
+
+    bool hasContent = false;
+    for (const LogEntry &entry : m_logEntries) {
+        const QString metadata = formatMetadata(entry);
+        const QString message = entry.text;
+        if (!filter.isEmpty()) {
+            const Qt::CaseSensitivity cs = Qt::CaseInsensitive;
+            if (!metadata.contains(filter, cs) && !message.contains(filter, cs)) {
+                continue;
+            }
+        }
+
+        if (hasContent) {
+            cursor.insertBlock();
+        }
+        hasContent = true;
+
+        const QTextCharFormat format = formatForEntry(entry);
+        if (!metadata.isEmpty()) {
+            cursor.insertText(metadata, format);
+            cursor.insertBlock();
+        }
+
+        QString normalized = message;
+        normalized.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+        normalized.replace('\r', '\n');
+        const QStringList lines = normalized.split('\n');
+        for (int i = 0; i < lines.size(); ++i) {
+            if (i > 0) {
+                cursor.insertBlock();
+            }
+            cursor.insertText(lines.at(i), format);
+        }
+    }
+
+    ui->textEditRx->setTextCursor(cursor);
+    if (atBottom) {
+        QTextCursor endCursor = ui->textEditRx->textCursor();
+        endCursor.movePosition(QTextCursor::End);
+        ui->textEditRx->setTextCursor(endCursor);
+        ui->textEditRx->verticalScrollBar()->setValue(ui->textEditRx->verticalScrollBar()->maximum());
+    }
+}
+
+QString TextTRView::formatMetadata(const LogEntry &entry) const
+{
+    const QString directionText = entry.direction == LogDirection::Receive
+            ? QStringLiteral("RECV")
+            : QStringLiteral("SEND");
+    const QString codecText = entry.isHex ? QStringLiteral("HEX") : QStringLiteral("ASCII");
+    if (m_logWithTimestamp) {
+        return QStringLiteral("[%1]# %2 %3")
+                .arg(entry.timestamp.toString(m_timeStampFormat), directionText, codecText);
+    }
+    return QStringLiteral("# %1 %2").arg(directionText, codecText);
+}
+
+QTextCharFormat TextTRView::formatForEntry(const LogEntry &entry) const
+{
+    static const QColor kReceiveColor(QStringLiteral("#66bb6a"));
+    static const QColor kTransmitColor(QStringLiteral("#1976d2"));
+    QTextCharFormat format;
+    format.setForeground(entry.direction == LogDirection::Receive ? kReceiveColor : kTransmitColor);
+    return format;
+}
+
+QString TextTRView::commandDisplayText(const CommandPreset &preset) const
+{
+    if (!preset.name.isEmpty() && !preset.note.isEmpty()) {
+        return QStringLiteral("%1 — %2").arg(preset.name, preset.note);
+    }
+    if (!preset.name.isEmpty()) {
+        return preset.name;
+    }
+    if (!preset.note.isEmpty()) {
+        return QStringLiteral("%1 — %2").arg(preset.command, preset.note);
+    }
+    return preset.command;
+}
+
+void TextTRView::findInReceive(bool forward)
+{
+    const QString keyword = ui->searchLineEdit->text();
+    if (keyword.isEmpty()) {
+        return;
+    }
+    QTextDocument::FindFlags flags;
+    if (!forward) {
+        flags |= QTextDocument::FindBackward;
+    }
+    if (!ui->textEditRx->find(keyword, flags)) {
+        QTextCursor cursor = ui->textEditRx->textCursor();
+        cursor.movePosition(forward ? QTextCursor::Start : QTextCursor::End);
+        ui->textEditRx->setTextCursor(cursor);
+        ui->textEditRx->find(keyword, flags);
+    }
+}
+
 void TextTRView::receiveData(const QByteArray &array)
 {
-    QString string, pre;
-    if (ui->portReadAscii->isChecked()) {
-        if (m_hexCount > 0) {
-            pre = '\n';
-        }
-        m_hexCount = -1;
-        arrayToString(string, array);
-    } else {
+    if (array.isEmpty()) {
+        return;
+    }
+    QString string;
+    const bool hexMode = ui->portReadHex->isChecked();
+    if (hexMode) {
         if (m_hexCount == -1) {
             m_hexCount = 0;
-            pre = '\n';
         }
         arrayToHex(string, array, 16);
-    }
-    if (m_timeStamp) {
-        appendTimeStamp(string);
     } else {
-        ui->textEditRx->append(pre + string);
+        m_hexCount = -1;
+        arrayToString(string, array);
     }
+    appendLogEntry(LogDirection::Receive, hexMode, string);
 }
 
 void TextTRView::clear()
@@ -189,6 +433,8 @@ void TextTRView::clear()
     ui->textEditRx->clear();
     m_asciiBuf->clear();
     m_hexCount = 0;
+    m_logEntries.clear();
+    rebuildReceiveView();
 }
 
 void TextTRView::setFontFamily(QString fontFamily, int size, QString style)
@@ -213,16 +459,20 @@ void TextTRView::setEnabled(bool enabled)
 void TextTRView::sendData()
 {
     QByteArray array;
+    const QString text = ui->textEditTx->toPlainText();
 
     if (ui->portWriteAscii->isChecked() == true) {
         if(m_codecName == "ASCII"){
-            array = ui->textEditTx->toPlainText().toLatin1();
+            array = text.toLatin1();
         }else{
             QTextCodec *code = QTextCodec::codecForName(m_codecName);
-            array = code->fromUnicode(ui->textEditTx->toPlainText());
+            array = code->fromUnicode(text);
         }
     } else {
-        array = QByteArray::fromHex(ui->textEditTx->toPlainText().toLatin1());
+        array = QByteArray::fromHex(text.toLatin1());
+    }
+    if (!text.isEmpty()) {
+        appendLogEntry(LogDirection::Transmit, ui->portWriteHex->isChecked(), text);
     }
     emit transmitData(array);
 }
@@ -237,18 +487,7 @@ void TextTRView::onSendButtonClicked()
     QString str = ui->textEditTx->toPlainText();
     if (!str.isEmpty()) {
         sendData();
-
-        // 历史记录下拉列表删除多余项
-        while (ui->historyBox->count() >= 20) {
-            ui->historyBox->removeItem(19);
-        }
-        // 数据写入历史记录下拉列表
-        int i = ui->historyBox->findText(str);
-        if (i != -1) { // 存在的项先删除
-            ui->historyBox->removeItem(i);
-        }
-        ui->historyBox->insertItem(0, str); // 数据添加到第0个元素
-        ui->historyBox->setCurrentIndex(0);
+        rememberHistory(str);
     }
 }
 
@@ -290,9 +529,81 @@ void TextTRView::setTextCodec(const QString &name)
     }
 }
 
-void TextTRView::onHistoryBoxChanged(const QString &string)
+void TextTRView::onHistoryBoxChanged(const QString &)
 {
-    ui->textEditTx->setPlainText(string);
+    const int index = ui->historyBox->currentIndex();
+    if (index < 0) {
+        return;
+    }
+    const QVariant data = ui->historyBox->itemData(index, Qt::UserRole);
+    const QString command = data.toString();
+    if (!command.isEmpty()) {
+        ui->textEditTx->setPlainText(command);
+    } else {
+        ui->textEditTx->setPlainText(ui->historyBox->itemText(index));
+    }
+}
+
+void TextTRView::onFilterTextChanged(const QString &)
+{
+    rebuildReceiveView();
+}
+
+void TextTRView::onClearFilterClicked()
+{
+    ui->filterLineEdit->clear();
+}
+
+void TextTRView::onSearchReturnPressed()
+{
+    findInReceive(true);
+}
+
+void TextTRView::onLogTimestampToggled(bool enabled)
+{
+    m_logWithTimestamp = enabled;
+    rebuildReceiveView();
+}
+
+void TextTRView::onSaveCommandClicked()
+{
+    CommandEditDialog dialog(this);
+    dialog.setCommandText(ui->textEditTx->toPlainText());
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+    CommandPreset preset = dialog.preset();
+    preset.command = preset.command.trimmed();
+    if (preset.command.isEmpty()) {
+        return;
+    }
+
+    auto it = std::find_if(m_userCommands.begin(), m_userCommands.end(), [&](const CommandPreset &existing) {
+        if (!preset.name.isEmpty() && !existing.name.isEmpty()) {
+            return existing.name.compare(preset.name, Qt::CaseInsensitive) == 0;
+        }
+        return existing.command == preset.command;
+    });
+    if (it != m_userCommands.end()) {
+        const int index = int(it - m_userCommands.begin());
+        m_userCommands[index] = preset;
+        if (index > 0) {
+            m_userCommands.remove(index);
+            m_userCommands.prepend(preset);
+        }
+    } else {
+        m_userCommands.prepend(preset);
+    }
+    refreshCommandBox();
+}
+
+void TextTRView::onManageCommandsClicked()
+{
+    CommandConfigDialog dialog(m_userCommands, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        m_userCommands = dialog.commands();
+        refreshCommandBox();
+    }
 }
 
 void TextTRView::arrayToHex(QString &str, const QByteArray &array, int countOfLine)
@@ -422,28 +733,6 @@ void TextTRView::arrayToString(QString &str, const QByteArray &array)
     default: // ASCII
         arrayToASCII(str, array);
         break;
-    }
-}
-
-void TextTRView::appendTimeStamp(const QString &string)
-{
-    QRegularExpression re(".+?(" + m_frameSeparator + "|$)");
-    QRegularExpressionMatch match = re.match(string);
-    QRegularExpressionMatchIterator it = re.globalMatch(string);
-    QString curTime = QDateTime::currentDateTime()
-            .toString(m_timeStampFormat);
-    while (it.hasNext()) {
-        QString span = it.next().captured(0);
-        if (m_nextFrame) {
-            ui->textEditRx->append(curTime);
-        }
-        m_nextFrame = span.indexOf(
-                    QRegularExpression(m_frameSeparator + "$")) != -1;
-        if (m_nextFrame) {
-            span.chop(m_frameSeparator.length());
-            span.append('\n');
-        }
-        ui->textEditRx->append(span);
     }
 }
 
