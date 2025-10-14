@@ -1,10 +1,13 @@
 #ifndef COMMANDCONFIGDIALOG_H
 #define COMMANDCONFIGDIALOG_H
 
+#include "commandpreset.h"
+
 #include <QDialog>
+#include <QVector>
 
 class QListWidget;
-class QLineEdit;
+class QListWidgetItem;
 class QPushButton;
 
 class CommandConfigDialog : public QDialog
@@ -12,9 +15,9 @@ class CommandConfigDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit CommandConfigDialog(const QStringList &commands, QWidget *parent = nullptr);
+    explicit CommandConfigDialog(const QVector<CommandPreset> &commands, QWidget *parent = nullptr);
 
-    QStringList commands() const;
+    QVector<CommandPreset> commands() const;
 
 private slots:
     void addCommand();
@@ -22,11 +25,12 @@ private slots:
     void updateButtonStates();
 
 private:
-    bool canAdd(const QString &text) const;
+    void appendListItem(const CommandPreset &preset);
+    void applyPresetToItem(QListWidgetItem *item, const CommandPreset &preset) const;
+    CommandPreset presetFromItem(int row) const;
 
 private:
     QListWidget *m_listWidget;
-    QLineEdit *m_inputEdit;
     QPushButton *m_addButton;
     QPushButton *m_removeButton;
 };

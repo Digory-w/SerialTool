@@ -1,16 +1,21 @@
 #ifndef TEXTTRVIEW_H
 #define TEXTTRVIEW_H
 
+#include "commandpreset.h"
 #include "../abstractview.h"
 
 #include <QByteArray>
 #include <QDateTime>
 #include <QStringList>
+#include <QTextCharFormat>
 #include <QVector>
 
 namespace Ui {
 class TextTRView;
 }
+
+class QKeyEvent;
+class QTimer;
 
 class TextTRView : public AbstractView
 {
@@ -35,6 +40,18 @@ public:
     void saveFile(const QString &fileName, const QString &filter);
 
 private:
+    enum class LogDirection {
+        Receive,
+        Transmit
+    };
+
+    struct LogEntry {
+        QDateTime timestamp;
+        QString text;
+        LogDirection direction;
+        bool isHex = false;
+    };
+
     void setFontFamily(QString fonts, int size, QString style);
     void setHighlight(const QString &language);
     void setTextCodec(const QString &name);
@@ -44,9 +61,11 @@ private:
     void setIndentationGuides(bool enable);
     void saveText(const QString &fname);
 
-    void appendReceivedEntry(const QString &text);
+    void appendLogEntry(LogDirection direction, bool isHexMode, const QString &text);
     void rebuildReceiveView();
-    QString formatEntry(const QDateTime &timestamp, const QString &text) const;
+    QString formatMetadata(const LogEntry &entry) const;
+    QTextCharFormat formatForEntry(const LogEntry &entry) const;
+    QString commandDisplayText(const CommandPreset &preset) const;
     void refreshCommandBox();
     void loadUserCommands(QSettings *config);
     void saveUserCommands(QSettings *config);
@@ -95,10 +114,9 @@ private:
     QByteArray m_codecName;
     bool m_logWithTimestamp = false;
     QString m_timeStampFormat;
-    QVector<QDateTime> m_entryTimestamps;
-    QStringList m_receivedTexts;
+    QVector<LogEntry> m_logEntries;
     QStringList m_historyRecords;
-    QStringList m_userCommands;
+    QVector<CommandPreset> m_userCommands;
 };
 
 #endif // TEXTTRVIEW_H
