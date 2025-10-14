@@ -96,6 +96,7 @@ private slots:
     void onLogTimestampToggled(bool enabled);
     void onSaveCommandClicked();
     void onManageCommandsClicked();
+    QTextCharFormat timestampGrayFormat()const;
 
 private:
     enum TextCodec {

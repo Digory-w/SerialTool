@@ -160,9 +160,9 @@ void TextTRView::loadSettings(QSettings *config)
     setTabWidth(config->value("TerminalTabWidth").toInt());
     setAutoIndent(config->value("TerminalAutoIndent").toBool());
     setIndentationGuides(config->value("TerminalIndentationGuides").toBool());
-    m_timeStampFormat = config->value("TerminalTimeStampFormat", "yyyy-MM-dd HH:mm:ss").toString();
+    m_timeStampFormat = config->value("TerminalTimeStampFormat", "yyyy-MM-dd HH:mm:ss.zzz").toString();
     if (m_timeStampFormat.isEmpty()) {
-        m_timeStampFormat = QStringLiteral("yyyy-MM-dd HH:mm:ss");
+        m_timeStampFormat = QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz");
     }
     rebuildReceiveView();
 }
@@ -284,11 +284,22 @@ void TextTRView::appendLogEntry(LogDirection direction, bool isHexMode, const QS
         return;
     }
     QString entryText = text;
+    bool hasNonNewlineCharacter = false;
+    for (const QChar ch : std::as_const(entryText)) {
+        if (ch != '\n' && ch != '\r') {
+            hasNonNewlineCharacter = true;
+            break;
+        }
+    }
     while (entryText.endsWith('\n') || entryText.endsWith('\r')) {
         entryText.chop(1);
     }
     if (entryText.isEmpty()) {
-        return;
+        if (!hasNonNewlineCharacter && !text.isEmpty()) {
+            entryText = text;
+        } else {
+            return;
+        }
     }
     LogEntry entry;
     entry.timestamp = QDateTime::currentDateTime();
@@ -306,7 +317,7 @@ void TextTRView::rebuildReceiveView()
     }
     const QString filter = ui->filterLineEdit->text();
     const bool atBottom = ui->textEditRx->verticalScrollBar()->value() ==
-            ui->textEditRx->verticalScrollBar()->maximum();
+                          ui->textEditRx->verticalScrollBar()->maximum();
 
     ui->textEditRx->clear();
     QTextCursor cursor = ui->textEditRx->textCursor();
@@ -314,8 +325,10 @@ void TextTRView::rebuildReceiveView()
 
     bool hasContent = false;
     for (const LogEntry &entry : m_logEntries) {
-        const QString metadata = formatMetadata(entry);
-        const QString message = entry.text;
+        const QString metadata = formatMetadata(entry); // 已按开关控制返回
+        const QString message  = entry.text;
+
+        // 过滤（保持原逻辑）
         if (!filter.isEmpty()) {
             const Qt::CaseSensitivity cs = Qt::CaseInsensitive;
             if (!metadata.contains(filter, cs) && !message.contains(filter, cs)) {
@@ -328,12 +341,32 @@ void TextTRView::rebuildReceiveView()
         }
         hasContent = true;
 
-        const QTextCharFormat format = formatForEntry(entry);
-        if (!metadata.isEmpty()) {
-            cursor.insertText(metadata, format);
-            cursor.insertBlock();
+        const QTextCharFormat msgFormat = formatForEntry(entry); // 正文：接收绿 / 发送蓝
+
+        // —— 元信息区：仅在开关打开时输出，两行皆为灰色 ——
+        if (m_logWithTimestamp) {
+            const QTextCharFormat metaFormat = timestampGrayFormat();
+            if (m_logWithTimestamp) {
+                const QTextCharFormat metaFormat = timestampGrayFormat();
+
+                // 时间戳 + meta 同行输出
+                const QString ts = QStringLiteral("[%1]").arg(entry.timestamp.toString(m_timeStampFormat));
+                const QString metaLine = metadata;
+
+                QString line;
+                if (!metaLine.isEmpty()) {
+                    line = QStringLiteral("%1  %2").arg(ts, metaLine);  // 拼为一行
+                } else {
+                    line = ts;
+                }
+
+                cursor.insertText(line, metaFormat);
+                cursor.insertBlock();  // 换到下一行再输出消息正文
+            }
+
         }
 
+        // —— 正文（保持原逻辑，颜色由 msgFormat 决定） ——
         QString normalized = message;
         normalized.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
         normalized.replace('\r', '\n');
@@ -342,7 +375,7 @@ void TextTRView::rebuildReceiveView()
             if (i > 0) {
                 cursor.insertBlock();
             }
-            cursor.insertText(lines.at(i), format);
+            cursor.insertText(lines.at(i), msgFormat);
         }
     }
 
@@ -351,20 +384,24 @@ void TextTRView::rebuildReceiveView()
         QTextCursor endCursor = ui->textEditRx->textCursor();
         endCursor.movePosition(QTextCursor::End);
         ui->textEditRx->setTextCursor(endCursor);
-        ui->textEditRx->verticalScrollBar()->setValue(ui->textEditRx->verticalScrollBar()->maximum());
+        ui->textEditRx->verticalScrollBar()->setValue(
+            ui->textEditRx->verticalScrollBar()->maximum());
     }
 }
 
+
 QString TextTRView::formatMetadata(const LogEntry &entry) const
 {
+    if (!m_logWithTimestamp) {
+        return QString(); // 关闭开关：不显示任何元信息行
+    }
+
     const QString directionText = entry.direction == LogDirection::Receive
             ? QStringLiteral("RECV")
             : QStringLiteral("SEND");
-    const QString codecText = entry.isHex ? QStringLiteral("HEX") : QStringLiteral("ASCII");
-    if (m_logWithTimestamp) {
-        return QStringLiteral("[%1]# %2 %3")
-                .arg(entry.timestamp.toString(m_timeStampFormat), directionText, codecText);
-    }
+    const QString codecText = entry.isHex ? QStringLiteral("HEX")
+                                          : QStringLiteral("ASCII");
+    // 仅返回 # RECV HEX / # SEND ASCII，不带时间戳
     return QStringLiteral("# %1 %2").arg(directionText, codecText);
 }
 
@@ -778,3 +815,11 @@ void TextTRView::saveFile(const QString &fileName, const QString &filter)
         saveText(fileName);
     }
 }
+
+QTextCharFormat TextTRView::timestampGrayFormat() const
+{
+    QTextCharFormat fmt;
+    fmt.setForeground(QColor("#9e9e9e"));  // 固定灰色
+    return fmt;
+}
+
